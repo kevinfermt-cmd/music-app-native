@@ -1,98 +1,183 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useState, useContext } from 'react';
+import { View, Text, TextInput, FlatList, Image, TouchableOpacity, StyleSheet, ActivityIndicator, SafeAreaView, StatusBar } from 'react-native';
+import { MusicContext } from './_layout';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+export default function Home() {
+  const [query, setQuery] = useState('');
+  const [songs, setSongs] = useState<any[]>([]); 
+  const [loading, setLoading] = useState(false);
+  
+  // Consumimos el contexto global que creamos en el layout
+  const { currentSong, isPlaying, playSong } = useContext(MusicContext);
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
+  const handleSearch = async () => {
+    if (!query.trim()) return;
+    setLoading(true);
+    setSongs([]);
+    
+    try {
+      const vercelUrl = 'https://music-pwa-beta.vercel.app'; 
+      const res = await fetch(`${vercelUrl}/api/search?q=${encodeURIComponent(query)}`);
+      
+      if (!res.ok) throw new Error('Error en la búsqueda');
+      
+      const data = await res.json();
+      setSongs(data);
+    } catch (err) {
+      console.error("Error buscando:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const renderSong = ({ item }: { item: any }) => {
+    const isThisSongPlaying = currentSong?.id === item.id;
+
     return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
+      <TouchableOpacity 
+        style={styles.songCard} 
+        activeOpacity={0.7}
+        onPress={() => playSong(item)}
+      >
+        <Image source={{ uri: item.thumbnail }} style={styles.thumbnail} />
+        <View style={styles.songInfo}>
+          <Text style={[styles.songTitle, isThisSongPlaying && { color: '#3B82F6' }]} numberOfLines={1}>
+            {item.title}
+          </Text>
+          <Text style={styles.songArtist} numberOfLines={1}>{item.artist}</Text>
+        </View>
+        <View style={styles.playIconContainer}>
+          <Text style={styles.playIcon}>
+            {isThisSongPlaying && isPlaying ? '||' : '▶'}
+          </Text>
+        </View>
+      </TouchableOpacity>
     );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
+  };
+
   return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
-}
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#050505" />
+      
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Explorar</Text>
+      </View>
 
-export default function HomeScreen() {
-  return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
+      <View style={styles.searchContainer}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Busca artistas o canciones..."
+          placeholderTextColor="#666666"
+          value={query}
+          onChangeText={setQuery}
+          onSubmitEditing={handleSearch}
+          returnKeyType="search"
+        />
+      </View>
 
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
-
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
-
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
-    </ThemedView>
+      {loading ? (
+        <View style={styles.centerContent}>
+          <ActivityIndicator size="large" color="#FFFFFF" />
+          <Text style={styles.loadingText}>Buscando contenido...</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={songs}
+          keyExtractor={(item, index) => item.id || index.toString()}
+          renderItem={renderSong}
+          contentContainerStyle={styles.listContainer}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
+    backgroundColor: '#050505',
+  },
+  header: {
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 20,
+  },
+  headerTitle: {
+    fontSize: 34,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: -0.5,
+  },
+  searchContainer: {
+    paddingHorizontal: 24,
+    marginBottom: 20,
+  },
+  searchInput: {
+    backgroundColor: '#141414',
+    color: '#FFFFFF',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderRadius: 16,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#262626',
+  },
+  listContainer: {
+    paddingHorizontal: 24,
+    paddingBottom: 120, // Espacio para que el reproductor global no tape los resultados
+  },
+  songCard: {
     flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#141414',
+    padding: 12,
+    borderRadius: 20,
+    marginBottom: 12,
   },
-  safeArea: {
+  thumbnail: {
+    width: 60,
+    height: 60,
+    borderRadius: 14,
+    backgroundColor: '#262626',
+  },
+  songInfo: {
     flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
-  },
-  heroSection: {
-    alignItems: 'center',
+    marginLeft: 16,
     justifyContent: 'center',
+  },
+  songTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginBottom: 4,
+  },
+  songArtist: {
+    fontSize: 14,
+    color: '#A3A3A3',
+  },
+  playIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#262626',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 10,
+  },
+  playIcon: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    marginLeft: 2,
+  },
+  centerContent: {
     flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  title: {
-    textAlign: 'center',
-  },
-  code: {
-    textTransform: 'uppercase',
-  },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
-  },
+  loadingText: {
+    color: '#A3A3A3',
+    marginTop: 12,
+    fontSize: 14,
+  }
 });
