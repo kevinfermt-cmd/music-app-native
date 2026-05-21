@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext } from 'react';
+import { useState, useEffect, createContext } from 'react';
 import { View, Text, TouchableOpacity, Image, StyleSheet } from 'react-native';
 import { Slot } from 'expo-router';
 import { Audio } from 'expo-av';
@@ -23,24 +23,6 @@ export default function RootLayout() {
     setupAudio();
   }, []);
 
-  const fetchWithRedundancy = async (videoId: string) => {
-  // Tu servidor en Vercel es el único que necesitas.
-  // Es tu "proxy" privado.
-  const myBackend = 'https://music-pwa-beta.vercel.app/api/stream';
-
-  try {
-    const res = await fetch(`${myBackend}?id=${videoId}`);
-    if (!res.ok) throw new Error("Backend falló");
-    
-    const data = await res.json();
-    if (data.url) return data.url;
-    throw new Error("No hay URL");
-  } catch (e) {
-    console.error("Error crítico en el backend:", e);
-    throw new Error("No se pudo obtener el audio");
-  }
-};
-
   const playSong = async (song: any) => {
     try {
       setIsLoadingAudio(true);
@@ -51,10 +33,9 @@ export default function RootLayout() {
         await soundObject.unloadAsync();
       }
 
-      const audioUrl = await fetchWithRedundancy(song.id);
-
+      // El enlace de audio ya viene limpio desde la busqueda, lo reproducimos directo
       const { sound } = await Audio.Sound.createAsync(
-        { uri: audioUrl },
+        { uri: song.audioUrl },
         { shouldPlay: true }
       );
 
@@ -69,7 +50,7 @@ export default function RootLayout() {
       });
 
     } catch (error) {
-      console.error("Error al reproducir:", error);
+      console.error("Error critico al reproducir:", error);
       setIsLoadingAudio(false);
     }
   };
@@ -99,7 +80,7 @@ export default function RootLayout() {
             <View style={styles.playerInfo}>
               <Text style={styles.playerTitle} numberOfLines={1}>{currentSong.title}</Text>
               <Text style={styles.playerArtist} numberOfLines={1}>
-                {isLoadingAudio ? 'Conectando audio...' : currentSong.artist}
+                {isLoadingAudio ? 'Cargando pista...' : currentSong.artist}
               </Text>
             </View>
             <TouchableOpacity style={styles.playButton} onPress={togglePlay}>
