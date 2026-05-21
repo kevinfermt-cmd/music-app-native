@@ -9,31 +9,56 @@ export default function Home() {
   
   const { currentSong, isPlaying, playSong } = useContext(MusicContext);
 
-    const handleSearch = async () => {
+      const handleSearch = async () => {
     if (!query.trim()) return;
     setLoading(true);
     setSongs([]);
     
     try {
-      // Pon aqui la URL real de tu proyecto Vercel
+      // Recuerda poner tu URL de Vercel aquí
       const vercelUrl = 'https://music-pwa-beta.vercel.app'; 
       const res = await fetch(`${vercelUrl}/api/saavn?q=${encodeURIComponent(query)}`);
       const json = await res.json();
       
-      if (json.success && json.data && json.data.results) {
-        const formattedSongs = json.data.results.map((song: any) => {
-          const highResImage = song.image[song.image.length - 1]?.url || song.image[0]?.url;
-          const bestAudio = song.downloadUrl[song.downloadUrl.length - 1]?.url || song.downloadUrl[0]?.url;
+      // Esto imprimirá en la terminal de Codespaces lo que realmente está llegando
+      console.log("Llegó de Vercel:", JSON.stringify(json).substring(0, 300));
+      
+      // Flexibilidad absoluta para leer los resultados
+      const results = json?.data?.results || json?.data || json?.results || [];
+      
+      if (Array.isArray(results) && results.length > 0) {
+        const formattedSongs = results.map((song: any) => {
+          
+          // Helper para sacar la URL ya sea que venga como arreglo, objeto o texto simple
+          const extractBestUrl = (mediaItem: any) => {
+            if (Array.isArray(mediaItem) && mediaItem.length > 0) {
+              const item = mediaItem[mediaItem.length - 1]; // Suele ser la mejor calidad
+              return item?.url || item?.link || (typeof item === 'string' ? item : null);
+            }
+            return typeof mediaItem === 'string' ? mediaItem : null;
+          };
+
+          const highResImage = extractBestUrl(song.image);
+          const bestAudio = extractBestUrl(song.downloadUrl) || extractBestUrl(song.media_url);
 
           return {
             id: song.id,
-            title: song.name,
-            artist: song.primaryArtists,
-            thumbnail: highResImage,
+            title: song.name || song.title || "Desconocido",
+            artist: song.primaryArtists || song.singers || "Artista",
+            thumbnail: highResImage || 'https://via.placeholder.com/150',
             audioUrl: bestAudio
           };
         });
-        setSongs(formattedSongs);
+        
+        // Solo guardamos en la lista las canciones que de verdad tengan un enlace de audio extraído
+        const validSongs = formattedSongs.filter(s => s.audioUrl);
+        setSongs(validSongs);
+        
+        if (validSongs.length === 0) {
+          console.log("Se encontraron resultados, pero ninguno tenía un link de audio funcional.");
+        }
+      } else {
+        console.log("La búsqueda no trajo resultados o la estructura es irreconocible.");
       }
     } catch (err) {
       console.error("Error buscando:", err);
@@ -41,6 +66,7 @@ export default function Home() {
       setLoading(false);
     }
   };
+  
   
 
   const renderSong = ({ item }: { item: any }) => {
