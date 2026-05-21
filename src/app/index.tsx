@@ -7,7 +7,6 @@ export default function Home() {
   const [songs, setSongs] = useState<any[]>([]); 
   const [loading, setLoading] = useState(false);
   
-  // Consumimos el contexto global que creamos en el layout
   const { currentSong, isPlaying, playSong } = useContext(MusicContext);
 
   const handleSearch = async () => {
@@ -16,13 +15,27 @@ export default function Home() {
     setSongs([]);
     
     try {
-      const vercelUrl = 'https://music-pwa-beta.vercel.app'; 
-      const res = await fetch(`${vercelUrl}/api/search?q=${encodeURIComponent(query)}`);
+      // Usamos una API musical real que devuelve mp4 directos sin bloqueos
+      const res = await fetch(`https://saavn.dev/api/search/songs?query=${encodeURIComponent(query)}`);
+      const json = await res.json();
       
-      if (!res.ok) throw new Error('Error en la búsqueda');
-      
-      const data = await res.json();
-      setSongs(data);
+      if (json.success && json.data && json.data.results) {
+        const formattedSongs = json.data.results.map((song: any) => {
+          // Extraemos la imagen de mejor resolucion
+          const highResImage = song.image[song.image.length - 1]?.url || song.image[0]?.url;
+          // Extraemos el enlace de audio de mejor calidad (usualmente 320kbps)
+          const bestAudio = song.downloadUrl[song.downloadUrl.length - 1]?.url || song.downloadUrl[0]?.url;
+
+          return {
+            id: song.id,
+            title: song.name,
+            artist: song.primaryArtists,
+            thumbnail: highResImage,
+            audioUrl: bestAudio
+          };
+        });
+        setSongs(formattedSongs);
+      }
     } catch (err) {
       console.error("Error buscando:", err);
     } finally {
@@ -78,7 +91,7 @@ export default function Home() {
       {loading ? (
         <View style={styles.centerContent}>
           <ActivityIndicator size="large" color="#FFFFFF" />
-          <Text style={styles.loadingText}>Buscando contenido...</Text>
+          <Text style={styles.loadingText}>Buscando música...</Text>
         </View>
       ) : (
         <FlatList
@@ -125,7 +138,7 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     paddingHorizontal: 24,
-    paddingBottom: 120, // Espacio para que el reproductor global no tape los resultados
+    paddingBottom: 120, 
   },
   songCard: {
     flexDirection: 'row',
