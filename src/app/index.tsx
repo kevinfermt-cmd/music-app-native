@@ -14,57 +14,37 @@ export default function Home() {
     setLoading(true);
     setSongs([]);
 
-    // Consultamos directo desde tu celular, sin proxies ni Vercel
-    const apis = [
-      `https://saavn.dev/api/search/songs?query=${encodeURIComponent(query)}`,
-      `https://saavn.me/search/songs?query=${encodeURIComponent(query)}`
-    ];
+    try {
+      // Usamos la infraestructura de Apple: 100% estable y libre de bloqueos
+      const url = `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=20`;
+      
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Error conectando con Apple");
+      
+      const json = await res.json();
 
-    let dataFetched = null;
+      if (json.results && json.results.length > 0) {
+        const formattedSongs = json.results.map((song: any) => ({
+          id: song.trackId.toString(),
+          title: song.trackName || "Desconocido",
+          artist: song.artistName || "Artista",
+          // Apple manda la imagen en 100x100, usamos un hack de URL para pedirla en 600x600 HD
+          thumbnail: song.artworkUrl100 ? song.artworkUrl100.replace('100x100bb', '600x600bb') : 'https://via.placeholder.com/150',
+          // Este es un stream directo oficial de Apple (.m4a)
+          audioUrl: song.previewUrl 
+        }));
 
-    for (const url of apis) {
-      try {
-        const res = await fetch(url);
-        if (!res.ok) continue;
-        
-        const json = await res.json();
-        if (json?.success && json?.data?.results) {
-          dataFetched = json.data.results;
-          break; // Si funciona, rompemos el ciclo
-        }
-      } catch (err) {
-        console.log("Fallo instancia local:", url);
+        // Filtramos para asegurar que haya audio
+        const validSongs = formattedSongs.filter((s: any) => s.audioUrl);
+        setSongs(validSongs);
+      } else {
+        console.log("No se encontraron resultados.");
       }
+    } catch (err) {
+      console.log("Error crítico en la búsqueda:", err);
+    } finally {
+      setLoading(false);
     }
-
-    if (dataFetched) {
-      const formattedSongs = dataFetched.map((song: any) => {
-        // Extraemos las URLs con cuidado por si cambia la estructura
-        const extractBestUrl = (mediaItem: any) => {
-          if (Array.isArray(mediaItem) && mediaItem.length > 0) {
-            const item = mediaItem[mediaItem.length - 1];
-            return item?.url || item?.link || (typeof item === 'string' ? item : null);
-          }
-          return typeof mediaItem === 'string' ? mediaItem : null;
-        };
-
-        return {
-          id: song.id,
-          title: song.name || song.title || "Desconocido",
-          artist: song.primaryArtists || song.singers || "Artista",
-          thumbnail: extractBestUrl(song.image) || 'https://via.placeholder.com/150',
-          audioUrl: extractBestUrl(song.downloadUrl) || extractBestUrl(song.media_url)
-        };
-      });
-
-      // Filtramos para asegurar que el motor de audio siempre reciba un enlace valido
-      const validSongs = formattedSongs.filter((s: any) => s.audioUrl);
-      setSongs(validSongs);
-    } else {
-      console.log("No se pudo obtener datos de ninguna API directamente.");
-    }
-
-    setLoading(false);
   };
   
 
