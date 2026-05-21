@@ -8,65 +8,64 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   
   const { currentSong, isPlaying, playSong } = useContext(MusicContext);
-
-      const handleSearch = async () => {
+  
+    const handleSearch = async () => {
     if (!query.trim()) return;
     setLoading(true);
     setSongs([]);
-    
-    try {
-      // Recuerda poner tu URL de Vercel aquí
-      const vercelUrl = 'https://music-pwa-beta.vercel.app'; 
-      const res = await fetch(`${vercelUrl}/api/saavn?q=${encodeURIComponent(query)}`);
-      const json = await res.json();
-      
-      // Esto imprimirá en la terminal de Codespaces lo que realmente está llegando
-      console.log("Llegó de Vercel:", JSON.stringify(json).substring(0, 300));
-      
-      // Flexibilidad absoluta para leer los resultados
-      const results = json?.data?.results || json?.data || json?.results || [];
-      
-      if (Array.isArray(results) && results.length > 0) {
-        const formattedSongs = results.map((song: any) => {
-          
-          // Helper para sacar la URL ya sea que venga como arreglo, objeto o texto simple
-          const extractBestUrl = (mediaItem: any) => {
-            if (Array.isArray(mediaItem) && mediaItem.length > 0) {
-              const item = mediaItem[mediaItem.length - 1]; // Suele ser la mejor calidad
-              return item?.url || item?.link || (typeof item === 'string' ? item : null);
-            }
-            return typeof mediaItem === 'string' ? mediaItem : null;
-          };
 
-          const highResImage = extractBestUrl(song.image);
-          const bestAudio = extractBestUrl(song.downloadUrl) || extractBestUrl(song.media_url);
+    // Consultamos directo desde tu celular, sin proxies ni Vercel
+    const apis = [
+      `https://saavn.dev/api/search/songs?query=${encodeURIComponent(query)}`,
+      `https://saavn.me/search/songs?query=${encodeURIComponent(query)}`
+    ];
 
-          return {
-            id: song.id,
-            title: song.name || song.title || "Desconocido",
-            artist: song.primaryArtists || song.singers || "Artista",
-            thumbnail: highResImage || 'https://via.placeholder.com/150',
-            audioUrl: bestAudio
-          };
-        });
+    let dataFetched = null;
+
+    for (const url of apis) {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) continue;
         
-        // Solo guardamos en la lista las canciones que de verdad tengan un enlace de audio extraído
-        const validSongs = formattedSongs.filter(s => s.audioUrl);
-        setSongs(validSongs);
-        
-        if (validSongs.length === 0) {
-          console.log("Se encontraron resultados, pero ninguno tenía un link de audio funcional.");
+        const json = await res.json();
+        if (json?.success && json?.data?.results) {
+          dataFetched = json.data.results;
+          break; // Si funciona, rompemos el ciclo
         }
-      } else {
-        console.log("La búsqueda no trajo resultados o la estructura es irreconocible.");
+      } catch (err) {
+        console.log("Fallo instancia local:", url);
       }
-    } catch (err) {
-      console.error("Error buscando:", err);
-    } finally {
-      setLoading(false);
     }
+
+    if (dataFetched) {
+      const formattedSongs = dataFetched.map((song: any) => {
+        // Extraemos las URLs con cuidado por si cambia la estructura
+        const extractBestUrl = (mediaItem: any) => {
+          if (Array.isArray(mediaItem) && mediaItem.length > 0) {
+            const item = mediaItem[mediaItem.length - 1];
+            return item?.url || item?.link || (typeof item === 'string' ? item : null);
+          }
+          return typeof mediaItem === 'string' ? mediaItem : null;
+        };
+
+        return {
+          id: song.id,
+          title: song.name || song.title || "Desconocido",
+          artist: song.primaryArtists || song.singers || "Artista",
+          thumbnail: extractBestUrl(song.image) || 'https://via.placeholder.com/150',
+          audioUrl: extractBestUrl(song.downloadUrl) || extractBestUrl(song.media_url)
+        };
+      });
+
+      // Filtramos para asegurar que el motor de audio siempre reciba un enlace valido
+      const validSongs = formattedSongs.filter((s: any) => s.audioUrl);
+      setSongs(validSongs);
+    } else {
+      console.log("No se pudo obtener datos de ninguna API directamente.");
+    }
+
+    setLoading(false);
   };
-  
   
 
   const renderSong = ({ item }: { item: any }) => {
