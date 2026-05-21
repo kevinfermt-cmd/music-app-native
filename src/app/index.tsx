@@ -16,7 +16,7 @@ export default function Home() {
     
     try {
       // Pon aqui la URL real de tu proyecto Vercel
-      const vercelUrl = 'https://TU-URL-DE-VERCEL.vercel.app'; 
+      const vercelUrl = 'https://music-pwa-beta.vercel.app'; 
       const res = await fetch(`${vercelUrl}/api/saavn?q=${encodeURIComponent(query)}`);
       const json = await res.json();
       
