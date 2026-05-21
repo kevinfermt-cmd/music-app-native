@@ -9,21 +9,20 @@ export default function Home() {
   
   const { currentSong, isPlaying, playSong } = useContext(MusicContext);
 
-  const handleSearch = async () => {
+    const handleSearch = async () => {
     if (!query.trim()) return;
     setLoading(true);
     setSongs([]);
     
     try {
-      // Usamos una API musical real que devuelve mp4 directos sin bloqueos
-      const res = await fetch(`https://saavn.dev/api/search/songs?query=${encodeURIComponent(query)}`);
+      // Pon aqui la URL real de tu proyecto Vercel
+      const vercelUrl = 'https://TU-URL-DE-VERCEL.vercel.app'; 
+      const res = await fetch(`${vercelUrl}/api/saavn?q=${encodeURIComponent(query)}`);
       const json = await res.json();
       
       if (json.success && json.data && json.data.results) {
         const formattedSongs = json.data.results.map((song: any) => {
-          // Extraemos la imagen de mejor resolucion
           const highResImage = song.image[song.image.length - 1]?.url || song.image[0]?.url;
-          // Extraemos el enlace de audio de mejor calidad (usualmente 320kbps)
           const bestAudio = song.downloadUrl[song.downloadUrl.length - 1]?.url || song.downloadUrl[0]?.url;
 
           return {
@@ -42,6 +41,7 @@ export default function Home() {
       setLoading(false);
     }
   };
+  
 
   const renderSong = ({ item }: { item: any }) => {
     const isThisSongPlaying = currentSong?.id === item.id;
